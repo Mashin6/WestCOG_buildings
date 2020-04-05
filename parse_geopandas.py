@@ -1,10 +1,10 @@
 import geopandas as gpd
 import pandas as pd
-from collections import OrderedDict 
+from shapely import speedups
+
+speedups.enable()
 
 buildings_shp = gpd.read_file('Buildings.shp')
-
-buildings_shp = buildings_shp.to_crs("EPSG:4326")
 
 # Remove unwanted objects
 buildings_shp = buildings_shp.drop(buildings_shp.query('FCODE == "Patio"').index)
@@ -24,49 +24,29 @@ buildings_shp = buildings_shp.rename(columns={"BLDGHEIGHT": "height", "BLDG_GNDE
 buildings_shp.loc[:, 'height'] = round(buildings_shp.loc[:, 'height']/3.281, 2)
 buildings_shp.loc[:, 'ele'] = round(buildings_shp.loc[:, 'ele']/3.281, 2)
 
-
-# Find all building parts that form one building (touch each other)
-building = []
-i = 0
-
-# Cycle through all building parts
-for part_id in range(0, len(buildings_shp)):
-	# Skip if building part was already found, else create new building object
-	if part_id in sum(building, []): continue
-	else: building.append([part_id])
-
-  
-	for select_part_id in building[i]:
-		neighbors = buildings_shp.geometry.touches(buildings_shp.geometry[select_part_id])
-		ind = buildings_shp.loc[list(neighbors)].index.tolist()
-
-		# Add parts to building object; This will force check of these new part for additional attached parts
-		building[i].extend(ind)
-
-		# Remove duplicates while preserving order of values using OrderDict
-		building[i] = list(OrderedDict.fromkeys(building[i]))
-
-	i += 1
-
-
-# Get outline of combined building parts
-for b in building:
-	if len(b) == 1:
-		buildings_shp.loc[b[0], 'building'] = 'yes'
-		buildings_shp.loc[b[0], 'FCODE'] = 'none'
-
-	else:
-		outline = gpd.GeoDataFrame({'geometry': buildings_shp.iloc[b, ].unary_union, 'building': ['yes']})
-		buildings_shp = pd.concat([buildings_shp, outline]).pipe(gpd.GeoDataFrame)
-
-
-# Re-label building parts
-buildings_shp.loc[buildings_shp['FCODE'] != 'none', 'building:part'] = 'yes'
-buildings_shp = buildings_shp.drop(columns=['FCODE'])
 # Fix: remove negative height data
-buildings_shp = buildings_shp.drop[ buildings_shp[buildings_shp['BLDGHEIGHT'] <= 0].index ]
+buildings_shp.loc[buildings_shp['height'] <= 0, 'height'] = None
 
 
+# Combin all shapes
+buildings_u=gpd.GeoDataFrame(geometry=list(buildings_shp.unary_union))
+# Tag as buildings
+buildings_u.loc[:, 'building'] = 'yes'
+# Merge
+buildings_shp = pd.concat([buildings_shp, buildings_u]).pipe(gpd.GeoDataFrame)
+
+# Find buildings that consist of one objects; Mark rows at the beging for keeping (as building)
+buildings_shp.loc[ buildings_shp.duplicated(subset='geometry', keep='last') , 'building'] = 'yes'
+# Remove .unary_union objects that were created from single objects building; Located at the end of dataframe
+buildings_shp = buildings_shp.drop(buildings_shp.duplicated(subset='geometry', keep='first'))
+
+# Re-lable buildings parts
+buildings_shp.loc[buildings_shp['building'] != 'yes', 'building:part'] = 'yes'
+buildings_shp = buildings_shp.drop(columns=['FCODE'])
+
+# Set as WGS84 transform
+buildings_shp.crs = "EPSG:4326"
 
 # Save output to shape file
 buildings_shp.to_file('Buildings-parsed.shp')
+buildings_shp.to_file('Buildings-parsed.geojson', driver='GeoJSON')
