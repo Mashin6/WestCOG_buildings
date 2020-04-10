@@ -38,7 +38,7 @@ buildings_shp = pd.concat([buildings_shp, buildings_u]).pipe(gpd.GeoDataFrame)
 # Find buildings that consist of one objects; Mark rows at the beging for keeping (as building)
 buildings_shp.loc[ buildings_shp.duplicated(subset='geometry', keep='last') , 'building'] = 'yes'
 # Remove .unary_union objects that were created from single objects building; Located at the end of dataframe
-buildings_shp = buildings_shp.drop(buildings_shp.duplicated(subset='geometry', keep='first'))
+buildings_shp = buildings_shp.drop_duplicates(subset='geometry', keep='first')
 
 # Re-lable buildings parts
 buildings_shp.loc[buildings_shp['building'] != 'yes', 'building:part'] = 'yes'
