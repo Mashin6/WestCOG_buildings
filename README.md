@@ -12,11 +12,3 @@ Height `BLDGHEIGHT=*` in feet, which will be converted to meters and tagged as `
 Elevation at ground level `BLDG_GNDEL=*`, which will be converted to `ele=*`
 Elevation at top of building part `BLDG_TOPEL=*`. This will be removed.
 Other tags `OBJECTID=*, Shape_Area=*, Shape_Leng=*` will be removed.
-
-
-Import will follow using JOSM:
-1. Load .shp file
-2. Select all objects labeled with 'building_p' and rename to 'building:part'
-3. Run Validator
-4. Fix any ovelapping builidings, overlapping nodes, etc.
-5. Upload
