@@ -27,20 +27,21 @@ buildings_shp.loc[:, 'ele'] = round(buildings_shp.loc[:, 'ele']/3.281, 2)
 # Fix: remove negative height data
 buildings_shp.loc[buildings_shp['height'] <= 0, 'height'] = None
 
-
-# Combin all shapes
+## Create building outline around building parts
+# Combine all touching shapes into union shape
 buildings_u=gpd.GeoDataFrame(geometry=list(buildings_shp.unary_union))
 # Tag as buildings
 buildings_u.loc[:, 'building'] = 'yes'
-# Merge
+# Merge with original dataset
 buildings_shp = pd.concat([buildings_shp, buildings_u]).pipe(gpd.GeoDataFrame)
 
-# Find buildings that consist of one objects; Mark rows at the beging for keeping (as building)
+## Remove building outlines that consist of a sigle building part (duplicate objects)
+# Find buildings that consist of one object; Mark rows at the beging for keeping (as building)
 buildings_shp.loc[ buildings_shp.duplicated(subset='geometry', keep='last') , 'building'] = 'yes'
 # Remove .unary_union objects that were created from single objects building; Located at the end of dataframe
 buildings_shp = buildings_shp.drop_duplicates(subset='geometry', keep='first')
 
-# Re-lable buildings parts
+# Re-label buildings parts
 buildings_shp.loc[buildings_shp['building'] != 'yes', 'building:part'] = 'yes'
 buildings_shp = buildings_shp.drop(columns=['FCODE'])
 
